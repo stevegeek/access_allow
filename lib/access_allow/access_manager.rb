@@ -9,7 +9,7 @@ module AccessAllow
       @action_rules = []
       @named_rules_map = {}
       @all_actions_rules = []
-      @no_match_rule = { violation: :severe }
+      @no_match_rule = {violation: :severe}
     end
 
     # When initialising an access manager for a controller make sure to clone the current parent controllers rules
@@ -33,8 +33,8 @@ module AccessAllow
     end
 
     def configure_no_match(violation_type, &block)
-      rule = { violation: violation_type }
-      rule[:handler] = block if block_given?
+      rule = {violation: violation_type}
+      rule[:handler] = block if block
       @no_match_rule = rule
     end
 
@@ -105,7 +105,7 @@ module AccessAllow
       given_names = Array.wrap(as)
       if actions.empty? && given_names.empty?
         raise StandardError,
-              "You must specify the actions which the rule applies to or if a check must have a name"
+          "You must specify the actions which the rule applies to or if a check must have a name"
       end
       {
         aliases: given_names.presence || actions,
@@ -124,9 +124,9 @@ module AccessAllow
       perm_config.to_a.flat_map do |c|
         namespace, perm_name = c
         if perm_name.is_a?(Array)
-          perm_name.map { |n| { namespace => n } }
+          perm_name.map { |n| {namespace => n} }
         else
-          { namespace => perm_name }
+          {namespace => perm_name}
         end
       end
     end
@@ -143,7 +143,7 @@ module AccessAllow
 
     def prepare_rule_set(rules)
       return rules if rules.is_a?(Hash) && (rules[:any] || rules[:all])
-      { all: Array.wrap(rules) }
+      {all: Array.wrap(rules)}
     end
 
     def insert_access_rule(parsed_rule)
