@@ -32,8 +32,7 @@ database, via the User association `permissions`.
 
 # Configuring Roles & their abilities
 
-Schema configured in `confinus/app_config/roles_and_permissions.rb` and actual configuration
-in `config.yml`
+Schema configured in `Configuration` and should be configured to whatever makes sense you want.
 
 The structure consists of:
 
