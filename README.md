@@ -2,15 +2,10 @@
 
 Permissions and access control gem for Rails.
 
-TODO: needs install generator for adding ability model and migration
-
 # Roles, Abilities and the permissions model
 
-Users can and should be assigned a `role` where a role is a named grouping of specific permissions (or abilities as we
-call them).
-
-Roles are configured in the application configuration. There are roles for `User` and `Admin` user types. The role
-for one user type cannot be used for the other user type.
+Users should be assigned a `role` where a role is a named grouping of specific permissions (or abilities as we
+call them). Roles are configured in the application configuration.
 
 Abilities are named permissions that live inside a namespace. These are context dependant. For example we might think
 of the ability for being able to check out a shopping cart as `shopping_cart: :check_out` where `shopping_cart` is the
@@ -22,17 +17,15 @@ database, via the User association `permissions`.
 ## Role and abilities utility methods
 
 `AccessAllow::Roles` provides a bunch of utility methods that
+
 * check if a given role name is for a specific user type or not
 * returns humanized versions of the role names
-* returns the roles for Select dropdowns
 
-`AccessAllow::Abilities` currently provides a single utility method to return a humanized version of an ability
-
-### AccessAllow::Abilities
+`AccessAllow::Abilities` currently provides utility methods to convert between string and hash representations of abilities.
 
 # Configuring Roles & their abilities
 
-Schema configured in `Configuration` and should be configured to whatever makes sense you want.
+Schema configured in `Configuration` and should be configured to create roles with their abilities.
 
 The structure consists of:
 
@@ -43,10 +36,10 @@ The structure consists of:
 
 where
 
-* `user_type_key` is one of `user`, `admin` and `super_admin`.
-* `user_role_key` is the name of the user role (eg `owner`)
-* `ability_namespace_key` is the name of the group of abilites (eg `tag_management`)
-* `ability_key` is the name of the actual ability (eg `edit_tag`) and is set to a boolean
+* `user_type_key` is determined from the model name of the user class (eg `User` => `user`)
+* `user_role_key` is the name of the user role (eg `account_owner`)
+* `ability_namespace_key` is the name of the group of abilites (eg `product_management`)
+* `ability_key` is the name of the actual ability (eg `edit_product`) and is set to a boolean
   to indicate if the ability is available to the specific configuration or not
 
 __Note__: ability names must be defined in the correct user type, role, namespace key space otherwise
@@ -55,11 +48,11 @@ permissions of a role around a specific feature.
 
 ## Setting a user specific ability
 
-User specific abilities are persisted in `Permission`s where the attribute `user_ability_name` stores the
-ability namespace and name in one combined string. The format is `/` separated. Eg `tag_management/edit_tag`.
+User specific abilities are persisted in `Permission`s where the attribute `ability_name` stores the
+ability namespace and name in one combined string. The format is `/` separated. Eg `tag_management/edit_tag`. Use
+`AccessAllow::Abilities` to convert between string and hash representations of abilities.
 
-The existence of a `Permission` is like that specific ability is set to `true` in the above described
-structure of abilities.
+The existence of a `Permission` sets the specific ability in the above described structure of abilities.
 
 The `AbilitiesManager` handles mixing these assigned abilities into the users specific total ability list.
 
@@ -82,7 +75,7 @@ helper methods
 * `.call!(user, <ability_namespace>: <ability_name>)`: checks if user has `ability_name` in `ability_namespace`. Returns
   true or raises `AccessAllow::ViolationError`
 
-The methods exposed by `Check` are useful for checking for abilities in service objects. To define abilities checks
+The methods exposed by `Check` are useful for checking for abilities in other objects. To define abilities checks
 around controller actions see the next section.
 
 # Controller DSL for specifying requirements and abilities needed to perform actions
@@ -92,8 +85,8 @@ requirements around the user or other entities related to the controller action.
 profile, one must check that the user who is trying to execute the `update` action has the ability (permission) to
 do it, but also that the user is even from the same company as the user being edited.
 
-As such we have defined a DSL that can be used in controllers to define sets of required checks and rules around actions
-to define what abilities or checks are needed to allow a specific action to execute. The rules can also define what
+As such a DSL exists that can be used in controllers to define sets of required checks and rules around actions that then 
+define what abilities or checks are needed to allow a specific action to execute. The rules can also define what
 should happen if the checks do not pass, or if no rules match the current situation.
 
 The DSL allows us to define 3 categories of our so called access rules:
@@ -111,8 +104,9 @@ if the check does not pass.
 
 ## Action allow rules
 
-Action allow rules are defined to provide specific rules which allow a user to perform a specific controller action. In
-fact the system prevents an action from being executed unless it is explicitly allowed for the given user trying to
+Action allow rules are defined to provide specific rules which allow a user to perform a specific controller action. 
+
+Note that AccessAllow prevents an action from being executed unless it is explicitly allowed for the given user trying to
 execute it.
 
 For a user to be allowed to perform a given controller action, there must be a matching "action allow" rule for that
@@ -130,12 +124,17 @@ There is more details below on this.
 
 Say for example you want a user to be `approved` and have the ability `company_profile/edit` to edit the company
 profile, and want to conditionally display a "Edit" button in the view. You could define a named check, say
-`:approved_can_edit` (that checks `approved` and that the user has the ability) and use it
-`if access_allowed? :approved_can_edit` to conditionally display the button.
+`:approved_can_edit` (that checks `approved` and that the user has the ability) and use it in the view to conditionally 
+display the button:
 
-Note that when you define an "action allow" rule it is automatically also added to these named checks by the action
-name, for example, if there is action allow rule for `:create` then we can use `access_allowed? :create`. Also note
-that it is possible to specify a custom 'named check' name for the "action allow" rule (see more below).
+    <% if access_allowed? :approved_can_edit %>
+      The button...
+    <% end %>
+
+Note that when you define an "action allow" rule it is automatically also added to these 'named checks' by the action
+name, for example, if there is action allow rule for `:create` then we can use `access_allowed? :create`. 
+
+Also note that it is possible to specify a custom 'named check' name for the "action allow" rule (see more below).
 
 ## No-match behaviour
 
@@ -153,13 +152,12 @@ checks.
 The violation types are:
 
 * `severe`:
-  this violation is considered something unusual and is therefore persisted in the Audit logs of the system
-  for future reference. The end user will simply see a 404 page to avoid exposing to them that there is in
-  fact an actionable endpoint at the route they tried to access.
+  this violation is considered something unusual and is logged. The end user will simply see a 404 page to avoid exposing 
+  to them that there is in fact an actionable endpoint at the route they tried to access.
 * `hidden`:
   this violation type is considered less severe, but still aims to avoid leaking information to the end user
   about the actual available routes on the app. If this violation is raised the user will see a 404 page and
-  the violation is simply logged to the app logs.
+  the violation is logged to the app logs.
 * `not_permitted`:
   this violation is used when a user can know that an action and route exists but that they do not
   have the assigned 'abilities' to perform the action. The end user will see a 403 (forbidden) page
@@ -222,19 +220,19 @@ Access rules must specify one or more 'checks' as part of their rule definition.
 
 'Checks' are basically controller methods which return a boolean to determine if the check 'passed' or 'failed'. Checks
 are normally custom code written for the given context of the feature. Note that checks do not need to perform the
-abilities checks specified by `with:`, these are performed by the Perms logic for you.
+abilities checks specified by `with:`, these are performed by the gem logic for you.
 
 Checks are specified by providing an instance method on the controller named `allow_(name)?`, where `name` is the check
 name, and which returns a boolean.
 
-For example, if one if defining a check for a action allow rule where the user must be approved on the platform, and
+For example, if defining a check for an action allow rule where the user must be approved on the platform, and
 have a specific ability assigned to them, then the 'check' part (named say `approved_user`) is "user must be approved
 on the platform" part of the rule, and would be defined on the controller as an instance method `allow_approved_user?`.
 
 There are some predefined 'common' checks, where you do not need to define the `allow_(name)?` method. These are:
 
 * `:public`: anyone, logged in or not
-* `:authenticated_user`: any logged in user
+* `:authenticated_user`: any logged in user  (uses `current_user` or whatever is set as the `current_user_method` in the config)
 
 # View helper to check permissions of user for conditional view sections
 
@@ -243,82 +241,103 @@ a list of "named check" names. If any of those check names passes the method ret
 
 Note that check names also include the actions for which rules exists, as described earlier.
 
+```erb
     # in controller
     allow_access :admin, to: :new
 
     # in view
-    &gt;% if access_allowed? :new %>
+    <% if access_allowed? :new %>
       Only 'admin' users who are allowed to execute action `:new` can see this
-    &gt;% end %>
+    <% end %>
+```
 
 and
 
+```erb
     # in controller
     allow_access :my_check, as: named_rule
 
     # in view
-    &gt;% if access_allowed? :named_rule %>
+    <% if access_allowed? :named_rule %>
       Only users for whom the `named_rule` check passes can see this
-    &gt;% end %>
+    <% end %>
+```
 
 # Example
 
 Consider the following view fragment, and then the controller heirarchy defined below:
 
-`tags/index.html.erb`
-
-```erbruby
-    <p>Tags Index</p>
-    &gt;% if access_allowed? :tag_management %>
-      <button>Add new tag</button>
-    &gt;% end %>
-    &gt;% if access_allowed? :view_usage_stats %>
-      <div> ... </div>
-    &gt;% end %>
-    <ul> ... </ul>
-```
-
 `tags_controller.rb`
 
 ```ruby
-    class TagsController < AdminController
-      # Allow any admin to access the :index and :show actions
-      access_allow :admin, to: [:index, :show]
-      # Only let admins with the ability `tag_management: :manage` to execute other actions.
-      # Also in our view we can use the check name `tag_management` to conditionally add say an "Add new Tag" button
-      access_allow :admin, with: {tag_management: :manage}, to: :all, as: :tag_management
-      # On the index page we also conditionally show some statistics about Tag usage, but only to admins with the right
-      # ability. This is done with the named check `:view_usage_stats`
-      access_allow :admin, with: {tag_management: :usage_stats}, as: :view_usage_stats
+class TagsController < AdminController
+  # Allow any admin to access the :index and :show actions
+  access_allow :admin, to: [:index, :show]
+  # Only let admins with the ability `tag_management: :manage` to execute other actions.
+  # Also in our view we can use the check name `tag_management` to conditionally add say an "Add new Tag" button
+  access_allow :admin, with: {tag_management: :manage}, to: :all, as: :tag_management
+  # On the index page we also conditionally show some statistics about Tag usage, but only to admins with the right
+  # ability. This is done with the named check `:view_usage_stats`
+  access_allow :admin, with: {tag_management: :usage_stats}, as: :view_usage_stats
+  # Admins with a special flag called "im_magic" can also access the :magic action
+  access_allow :magic_admin, to: :magic
+  
+  def allow_admin?
+    current_user.admin?
+  end
+  
+  def allow_magic_admin?
+    current_user.im_magic? && allow_admin?
+  end
+  
+  # ...
+end
 
-    class AdminController < AuthenticatedController
-      # Only admins can access actions on this controller or its sub controllers. Any authenticated user who is not an
-      # admin user will generate a severe access violation. They will see a 404 but the violation will be logged.
-      access_require :admin, violation: :severe
-      # Once we have verified the user is an admin we can 403 them instead of 404 when they try to access a page they
-      # dont have permission for. We don't need to hide the existance of the action from them.
-      access_no_match :not_permitted
+class AdminController < AuthenticatedController
+  # Only admins can access actions on this controller or its sub controllers. Any authenticated user who is not an
+  # admin user will generate a severe access violation. They will see a 404 but the violation will be logged.
+  access_require :admin, violation: :severe
+  # Once we have verified the user is an admin we can 403 them instead of 404 when they try to access a page they
+  # dont have permission for. We don't need to hide the existence of the action from them.
+  access_no_match :not_permitted
+  # ...
+end
 
-    class AuthenticatedController < ApplicationController
-      # Any action requires an authenticated user. The defined behaviour is that if the user trying to access the action
-      # is not authenticated they are redirected to the sign-in page.
-      access_require :authenticated_user, violation: :redirect do
-        saved_request_path_sign_in_path
-      end
+class AuthenticatedController < ApplicationController
+  # Any action requires an authenticated user. The defined behaviour is that if the user trying to access the action
+  # is not authenticated they are redirected to the sign-in page.
+  access_require :authenticated_user, violation: :redirect do
+    sign_in_path
+  end
 
-    class ApplicationController < ActionController::Base
-      # By default, if no access rules match when executing an action then show the user a 404 to prevent leaking the
-      # existance of the end point
-      access_no_match :hidden
+  # ...
+end
+
+class ApplicationController < ActionController::Base
+  # By default, if no access rules match when executing an action then show the user a 404 to prevent leaking the
+  # existence of the end point
+  access_no_match :hidden
+  # ...
+end
+
 ```
 
+`tags/index.html.erb`
 
-
-
-
-
+```erb
+    <p>Tags Index</p>
+    <% if access_allowed? :tag_management %>
+      <button>Add new tag</button>
+    <% end %>
+    <% if access_allowed? :view_usage_stats %>
+      <div> ... </div>
+    <% end %>
+    <ul> ... </ul>
+```
 
 ## Usage
+
+Add this to your `ApplicationController`
 
 ```ruby
 class ApplicationController < ActionController::Base
@@ -342,6 +361,11 @@ Or install it yourself as:
 ```bash
 $ gem install access_allow
 ```
+
+Then run the **generator to add the initializer**
+
+    rails g access_allow:install
+
 
 ## Contributing
 Contribution directions go here.
