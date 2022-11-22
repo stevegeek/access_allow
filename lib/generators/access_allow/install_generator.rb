@@ -15,7 +15,7 @@ module AccessAllow
 
       def copy_tasks
         template "templates/access_allow.rb", "config/initializers/access_allow.rb"
-        migration_template "templates/migration.rb", "db/migrate/access_allow_create_permissions.rb", migration_version: migration_version
+        migration_template "templates/migration.rb.erb", "db/migrate/access_allow_create_permissions.rb", migration_version: migration_version
       end
 
       def migration_version
