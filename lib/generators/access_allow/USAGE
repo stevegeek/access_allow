@@ -1,0 +1,3 @@
+Creates an initial configuration, an initializer and copies in the Permission migration & model
+
+    rails generate access_allow:install
