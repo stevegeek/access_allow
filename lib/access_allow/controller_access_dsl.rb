@@ -36,7 +36,6 @@ module AccessAllow
         access_manager.configure_no_match(violation, &block)
       end
 
-      # TODO: consider a `if:` conditional allowed on rules
       # Specify an access requirement, that must pass for any other action access checks to pass
       # The default violation level is :severe
       def access_require(check, with: nil, violation: :severe, &block)
