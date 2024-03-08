@@ -31,7 +31,7 @@ module AccessAllow
         Rails.logger.info error_message(false)
         return false
       end
-      ability_manager.has?(ability_namespace, ability_name).tap { |can| Rails.logger.info error_message(can) }
+      ability_manager.has?(ability_namespace, ability_name).tap { |can| Rails.logger.info error_message(can) unless can }
     end
 
     def possible!
