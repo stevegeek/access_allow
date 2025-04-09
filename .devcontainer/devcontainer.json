@@ -1,0 +1,12 @@
+{
+  "name": "Access Allow Gem Development",
+  "dockerComposeFile": "compose.yml",
+  "service": "access-allow-dev-env",
+  "containerEnv": {
+    "RAILS_ENV": "development"
+  },
+  "forwardPorts": [3000],
+  "postCreateCommand": "bundle install",
+  "postStartCommand": "bundle exec rake test",
+  "remoteUser": "vscode"
+}

@@ -16,5 +16,9 @@ gem "minitest", "~> 5.0"
 
 gem "standard", "~> 1.3"
 
+gem "simplecov", "~> 0.22.0", require: false
+
+gem "mocha", "~> 2.1", require: false
+
 # Start debugger with binding.b [https://github.com/ruby/debug]
 # gem "debug", ">= 1.0.0"
