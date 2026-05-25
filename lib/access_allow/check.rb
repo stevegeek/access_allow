@@ -28,28 +28,35 @@ module AccessAllow
 
     def possible?
       unless user
-        Rails.logger.info error_message(false)
+        log_failed_check
         return false
       end
-      ability_manager.has?(ability_namespace, ability_name).tap { |can| Rails.logger.info error_message(can) unless can }
+      ability_manager.has?(ability_namespace, ability_name).tap { |can| log_failed_check unless can }
     end
 
     def possible!
-      possible? || raise(AccessAllow::ViolationError, error_message(false))
+      possible? || raise(AccessAllow::ViolationError, error_message)
     end
 
     private
 
     attr_reader :user, :ability_namespace, :ability_name, :ability_manager
 
-    # Error messages
+    # A failed check is normal control flow, not a violation, so it logs at
+    # the configured level (default :debug; nil silences it). Actual access
+    # violations are logged by ControllerAccessDsl at :info/:error.
+    def log_failed_check
+      level = AccessAllow.configuration.permission_check_log_level
+      return unless level
+      AccessAllow.configuration.logger&.public_send(level) { error_message }
+    end
 
     def about_user
       user ? "#{user.class} with ID #{user.id}" : "Unauthenticated user"
     end
 
-    def error_message(can)
-      "#{about_user} #{can ? "can" : "cannot"} do '#{ability_name}'"
+    def error_message
+      "#{about_user} cannot do '#{ability_name}'"
     end
   end
 end

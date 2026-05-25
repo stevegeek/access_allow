@@ -4,18 +4,18 @@ class AccessAllow::RolesTest < ActiveSupport::TestCase
   setup do
     # Store original config
     @original_config = AccessAllow.configuration.roles_and_permissions.dup
-    
+
     # Set up test config
     test_config = {
       user: {
-        admin: { test: { ability1: true } },
-        staff: { test: { ability2: true } }
+        admin: {test: {ability1: true}},
+        staff: {test: {ability2: true}}
       },
       customer: {
-        primary: { test: { ability3: true } }
+        primary: {test: {ability3: true}}
       }
     }
-    
+
     AccessAllow.configure do |config|
       config.roles_and_permissions = test_config
     end
@@ -47,11 +47,11 @@ class AccessAllow::RolesTest < ActiveSupport::TestCase
     assert_equal 2, user_roles.size
     assert_includes user_roles, :admin
     assert_includes user_roles, :staff
-    
+
     customer_roles = AccessAllow::Roles.roles_for(:customer)
     assert_equal 1, customer_roles.size
     assert_includes customer_roles, :primary
-    
+
     # Non-existent type
     missing_roles = AccessAllow::Roles.roles_for(:missing)
     assert_empty missing_roles

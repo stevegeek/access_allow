@@ -37,7 +37,7 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
       config.roles_and_permissions = {
         user: {
           owner: {
-            test: { ability1: true }
+            test: {ability1: true}
           }
         }
       }
@@ -94,7 +94,7 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
     def allow_basic_security?(user)
       true # Always pass in our tests
     end
-    
+
     def allow_custom_required?(user)
       user && user.role == "custom" # This will always fail for our test users
     end
@@ -264,7 +264,7 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
 
   test "required rules are applied to all actions" do
     controller = TestController.new
-    
+
     # Temporarily override basic_security to fail
     def controller.allow_basic_security?(user)
       false
@@ -277,11 +277,11 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
 
   test "access_log_user_info formats user info correctly" do
     controller = TestController.new
-    
+
     # With a user
     controller.test_current_user = @admin_user
     assert_match(/User \d+/, controller.send(:access_log_user_info))
-    
+
     # Without a user
     controller.test_current_user = nil
     assert_equal "An unauthenticated user", controller.send(:access_log_user_info)
@@ -290,41 +290,41 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
   test "rule with multiple ability requirements" do
     controller = TestController.new
     controller.test_current_user = @regular_user
-    
+
     # User only has ability1, but needs both ability1 and ability2
     # First, confirm user has ability1
     assert_equal true, AccessAllow::Check.call(@regular_user, test: :ability1)
     # But doesn't have ability2
     assert_equal false, AccessAllow::Check.call(@regular_user, test: :ability2)
-    
+
     # So multi_ability should fail
     result = TestController.access_manager.allow_action?(@regular_user, controller, :multi_ability)
     assert_equal :hidden, result[:violation]
-    
+
     # Add the second permission
     @permission2 = Permission.create!(user: @regular_user, ability_name: "test/ability2")
     @regular_user.reload
-    
+
     # Now the user should have both abilities
     assert_equal true, AccessAllow::Check.call(@regular_user, test: :ability1)
     assert_equal true, AccessAllow::Check.call(@regular_user, test: :ability2)
-    
+
     # And should be able to access the multi_ability action
     result = TestController.access_manager.allow_action?(@regular_user, controller, :multi_ability)
     assert_equal true, result
-    
+
     # Clean up
     @permission2.destroy
   end
-  
+
   test "rule with multiple aliases" do
     controller = TestController.new
     controller.test_current_user = @admin_user
-    
+
     # Owner can access the action via any of its aliases
     assert controller.access_allowed?(:owner_alias1)
     assert controller.access_allowed?(:owner_alias2)
-    
+
     # Regular user cannot access via any alias
     controller.test_current_user = @regular_user
     refute controller.access_allowed?(:owner_alias1)
@@ -334,10 +334,10 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
   test "configure_no_match with custom handler" do
     # Test the API directly instead
     temp_manager = AccessAllow::AccessManager.new
-    
+
     custom_handler = proc { "/custom_path" }
     temp_manager.configure_no_match(:redirect, &custom_handler)
-    
+
     # Verify the configuration was applied
     rule = temp_manager.instance_variable_get(:@no_match_rule)
     assert_equal :redirect, rule[:violation]
@@ -347,16 +347,16 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
   test "no_match with custom handler" do
     controller = TestController.new
     controller.test_current_user = @admin_user
-    
+
     # Set up a temporary access manager without any rules for a specific action
     temp_manager = AccessAllow::AccessManager.new
     temp_manager.configure_no_match(:hidden) { "/not_found_path" }
-    
+
     # Execute allow_action with an action that has no rules
     result = temp_manager.allow_action?(@admin_user, controller, :no_rule_action)
     assert_equal :hidden, result[:violation]
     assert result[:handler].is_a?(Proc)
-    
+
     # Execute the handler
     handler = result[:handler]
     path = controller.instance_exec(&handler)
@@ -368,24 +368,24 @@ class ControllerPermissionsTest < ActionDispatch::IntegrationTest
     subclass = Class.new(TestController) do
       # Add a new rule specifically for this subclass
       access_allow :owner, to: :subclass_action
-      
+
       def subclass_action
         render plain: "Subclass action"
       end
     end
-    
+
     # The subclass should inherit all parent rules
     controller = subclass.new
     controller.test_current_user = @admin_user
-    
+
     # Check a rule from the parent
     result = subclass.access_manager.allow_action?(@admin_user, controller, :admin)
     assert_equal true, result
-    
+
     # Check the rule specific to the subclass
     result = subclass.access_manager.allow_action?(@admin_user, controller, :subclass_action)
     assert_equal true, result
-    
+
     # Regular user doesn't have access to the subclass action
     controller.test_current_user = @regular_user
     result = subclass.access_manager.allow_action?(@regular_user, controller, :subclass_action)

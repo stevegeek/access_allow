@@ -6,24 +6,24 @@ class AccessAllow::AbilitiesManagerTest < ActiveSupport::TestCase
     @original_config = AccessAllow.configuration.roles_and_permissions.dup
     @original_association = AccessAllow.configuration.permissions_association_name
     @original_role_method = AccessAllow.configuration.role_method_name
-    
+
     # Set up test config
     test_config = {
       user: {
-        admin: { 
-          namespace1: { ability1: true, ability2: false },
-          namespace2: { ability3: true }
+        admin: {
+          namespace1: {ability1: true, ability2: false},
+          namespace2: {ability3: true}
         },
         staff: {
-          namespace1: { ability1: false, ability2: true },
-          namespace2: { ability3: false }
+          namespace1: {ability1: false, ability2: true},
+          namespace2: {ability3: false}
         },
         primary: {
-          namespace1: { ability1: true }
+          namespace1: {ability1: true}
         }
       }
     }
-    
+
     AccessAllow.configure do |config|
       config.roles_and_permissions = test_config
       config.permissions_association_name = :permissions
@@ -31,15 +31,15 @@ class AccessAllow::AbilitiesManagerTest < ActiveSupport::TestCase
     end
 
     # Create stub user
-    @user = stub('User')
-    @user.stubs(:class).returns(stub('User class', name: 'User'))
+    @user = stub("User")
+    @user.stubs(:class).returns(stub("User class", name: "User"))
     @user.stubs(:id).returns(1)
-    
+
     # Mock user role
     @user.stubs(:role).returns("admin")
-    
+
     # Mock permission records
-    permission1 = stub('Permission')
+    permission1 = stub("Permission")
     permission1.stubs(:ability_name).returns("namespace1/ability2")
     @user.stubs(:permissions).returns([permission1])
   end
@@ -82,11 +82,11 @@ class AccessAllow::AbilitiesManagerTest < ActiveSupport::TestCase
   test "to_a returns array of permitted abilities" do
     manager = AccessAllow::AbilitiesManager.new(@user)
     abilities = manager.to_a
-    
+
     assert_includes abilities, [:namespace1, :ability1]
     assert_includes abilities, [:namespace1, :ability2] # Overridden by user permission
     assert_includes abilities, [:namespace2, :ability3]
-    
+
     # Should have exactly 3 abilities
     assert_equal 3, abilities.size
   end
@@ -95,7 +95,7 @@ class AccessAllow::AbilitiesManagerTest < ActiveSupport::TestCase
     @user.stubs(:role).returns("staff")
     # Clear specific permissions for this test
     @user.stubs(:permissions).returns([])
-    
+
     manager = AccessAllow::AbilitiesManager.new(@user)
     refute manager.has?(:namespace1, :ability1)
     assert manager.has?(:namespace1, :ability2)
@@ -105,42 +105,66 @@ class AccessAllow::AbilitiesManagerTest < ActiveSupport::TestCase
   test "uses default 'primary' role when user role is blank" do
     @user.stubs(:role).returns(nil)
     @user.stubs(:permissions).returns([])
-    
+
     manager = AccessAllow::AbilitiesManager.new(@user)
     assert manager.has?(:namespace1, :ability1)
   end
 
-  # Note: The following two tests verify what the code should do,
-  # but the actual implementation may be different. For now, we'll skip them.
-  
-  test "should handle unknown user types gracefully" do
-    skip "This test is skipped due to implementation differences"
-    # In the actual code, this may not raise an error but handle it differently
-    # We would expect this to raise an error based on the code
-    @user.stubs(:class).returns(stub('UnknownClass', name: 'UnknownClass'))
-    
-    assert_raises StandardError do
-      AccessAllow::AbilitiesManager.new(@user)
+  # The abilities are resolved lazily on the first `has?`, so the guard
+  # errors surface there rather than from the constructor.
+  test "raises when the user type has no permissions defined" do
+    @user.stubs(:class).returns(stub("UnknownClass", name: "UnknownClass"))
+    manager = AccessAllow::AbilitiesManager.new(@user)
+
+    error = assert_raises StandardError do
+      manager.has?(:namespace1, :ability1)
     end
+    assert_match(/User type/, error.message)
   end
 
-  test "should handle unknown roles gracefully" do
-    skip "This test is skipped due to implementation differences"
-    # The code's behavior might differ from what we expect
-    test_config = {
-      user: {
-        staff: { namespace1: { ability1: true } }
-      }
-    }
-    
+  test "raises when the user role has no permissions defined" do
     AccessAllow.configure do |config|
-      config.roles_and_permissions = test_config
+      config.roles_and_permissions = {user: {staff: {namespace1: {ability1: true}}}}
     end
-    
     @user.stubs(:role).returns("nonexistent_role")
-    
-    assert_raises StandardError do
-      AccessAllow::AbilitiesManager.new(@user)
+    @user.stubs(:permissions).returns([])
+    manager = AccessAllow::AbilitiesManager.new(@user)
+
+    error = assert_raises StandardError do
+      manager.has?(:namespace1, :ability1)
     end
+    assert_match(/Role/, error.message)
+  end
+
+  test "user-assigned permissions for abilities absent from the role are ignored" do
+    unknown = stub("Permission")
+    unknown.stubs(:ability_name).returns("namespace2/not_in_role")
+    @user.stubs(:permissions).returns([unknown])
+
+    manager = AccessAllow::AbilitiesManager.new(@user)
+    # The ability was never in the role, so the assignment is dropped and it
+    # resolves to nil (not granted); role-derived abilities are unaffected.
+    assert_nil manager.has?(:namespace2, :not_in_role)
+    assert manager.has?(:namespace1, :ability1)
+  end
+
+  test "to_a lists only permitted abilities" do
+    manager = AccessAllow::AbilitiesManager.new(@user)
+    pairs = manager.to_a
+    assert_includes pairs, [:namespace1, :ability1]
+    assert_includes pairs, [:namespace2, :ability3]
+    # ability2 is false in the role but granted via the user permission record
+    assert_includes pairs, [:namespace1, :ability2]
+  end
+
+  test "to_a omits abilities that are not permitted" do
+    @user.stubs(:role).returns("staff")
+    @user.stubs(:permissions).returns([])
+    manager = AccessAllow::AbilitiesManager.new(@user)
+    pairs = manager.to_a
+    # staff role: namespace1 {ability1: false, ability2: true}, namespace2 {ability3: false}
+    assert_includes pairs, [:namespace1, :ability2]
+    refute_includes pairs, [:namespace1, :ability1]
+    refute_includes pairs, [:namespace2, :ability3]
   end
 end

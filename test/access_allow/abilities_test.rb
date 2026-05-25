@@ -23,15 +23,27 @@ class AccessAllow::AbilitiesTest < ActiveSupport::TestCase
   end
 
   test "parse_qualified_name raises error with malformed input" do
-    assert_raises StandardError do
+    error = assert_raises StandardError do
       AccessAllow::Abilities.parse_qualified_name("invalid")
     end
+    assert_equal StandardError, error.class
+    assert_match(/namespace and name/, error.message)
   end
 
   test "parse_qualified_name raises error with too many parts" do
-    assert_raises StandardError do
+    error = assert_raises StandardError do
       AccessAllow::Abilities.parse_qualified_name("too/many/parts")
     end
+    assert_equal StandardError, error.class
+    assert_match(/namespace and name/, error.message)
+  end
+
+  test "parse_qualified_name raises error when a part is blank" do
+    error = assert_raises StandardError do
+      AccessAllow::Abilities.parse_qualified_name("/ability")
+    end
+    assert_equal StandardError, error.class
+    assert_match(/cannot be blank/, error.message)
   end
 
   test "humanized_name formats ability name for i18n" do

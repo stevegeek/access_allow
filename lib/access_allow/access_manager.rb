@@ -219,7 +219,7 @@ module AccessAllow
     # the rule configuration itself.
     def apply_custom_rule(rule, user, controller, action_name)
       controller.instance_exec(user, rule: rule, action_name: action_name) do |uut, rule_info|
-        check_name = "allow_#{rule}?".to_sym
+        check_name = :"allow_#{rule}?"
         unless respond_to?(check_name)
           raise NotImplementedError, "Check #{check_name} not implemented!"
         end

@@ -367,6 +367,34 @@ Then run the **generator to add the initializer**
     rails g access_allow:install
 
 
+## Configuration
+
+All configuration is done through `AccessAllow.configure` (see the generated
+initializer):
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `roles_and_permissions` | `{}` | The roles/abilities schema (often loaded from YAML). |
+| `current_user_method` | `:current_user` | Controller method returning the current user. |
+| `permissions_association_name` | `:permissions` | Association holding a user's individually-assigned permissions. |
+| `role_method_name` | `:role` | Method on the user returning their role name. |
+| `logger` | `Rails.logger` | Logger used for all access logging. |
+| `permission_check_log_level` | `:debug` | Level for per-check "user cannot do X" lines. Set to `nil` to silence them. |
+
+### Logging
+
+A failed ability check (`access_allowed?`, `has_perms_for?`, a `with:` ability
+that isn't granted) is normal control flow — it decides menu visibility,
+record scoping, and so on. These produce one log line per check, so by default
+they are logged at `:debug` and stay out of production logs. Set
+`config.permission_check_log_level = nil` to silence them entirely, or raise it
+(e.g. `:info`) while debugging permission resolution.
+
+Actual access *violations* — a blocked request, a `:severe`/`:hidden`/
+`:not_permitted`/`:redirect` outcome — are always logged at `:info`/`:error`
+regardless of this setting.
+
+
 ## Contributing
 Contribution directions go here.
 

@@ -10,11 +10,11 @@ module AccessAllow
 
       def parse_qualified_name(name)
         parts = name.split("/").map do |part|
-          raise StandardError "Ability namespaces or names cannot be blank" if part.blank?
+          raise StandardError, "Ability namespaces or names cannot be blank" if part.blank?
           part.to_sym
         end
         return parts if parts.size == 2
-        raise StandardError "Ability name must have a namespace and name (was #{name})"
+        raise StandardError, "Ability name must have a namespace and name (was #{name})"
       end
 
       def humanized_name(type, ability_namespace, ability_name)

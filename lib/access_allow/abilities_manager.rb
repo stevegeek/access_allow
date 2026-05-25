@@ -73,9 +73,5 @@ module AccessAllow
       role = user.send(AccessAllow.configuration.role_method_name)
       (role.presence || "primary").to_sym
     end
-
-    def about_user
-      "#{user.class} with ID #{user.id}"
-    end
   end
 end

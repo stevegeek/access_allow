@@ -4,31 +4,32 @@ class AccessAllow::CheckTest < ActiveSupport::TestCase
   setup do
     # Store original config
     @original_config = AccessAllow.configuration.roles_and_permissions.dup
-    
+
     # Set up test config
     test_config = {
       user: {
-        admin: { 
-          namespace1: { ability1: true, ability2: false },
-          namespace2: { ability3: true }
+        admin: {
+          namespace1: {ability1: true, ability2: false},
+          namespace2: {ability3: true}
         }
       }
     }
-    
+
     AccessAllow.configure do |config|
       config.roles_and_permissions = test_config
     end
 
     # Stub user and AbilitiesManager
-    @user = stub('User')
-    @user.stubs(:class).returns(stub('User class', name: 'User'))
+    @user = stub("User")
+    @user.stubs(:class).returns(stub("User class", name: "User"))
     @user.stubs(:id).returns(1)
     @user.stubs(:send).returns([])
-    
+
     # Rails logger mock
-    Rails.stubs(:logger).returns(stub('Logger'))
+    Rails.stubs(:logger).returns(stub("Logger"))
     Rails.logger.stubs(:info)
     Rails.logger.stubs(:error)
+    Rails.logger.stubs(:debug)
   end
 
   teardown do
@@ -39,10 +40,10 @@ class AccessAllow::CheckTest < ActiveSupport::TestCase
   end
 
   test "call delegates to possible? method" do
-    abilities_manager = stub('AbilitiesManager')
+    abilities_manager = stub("AbilitiesManager")
     AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
     abilities_manager.expects(:has?).with(:namespace1, :ability1).returns(true)
-    
+
     result = AccessAllow::Check.call(@user, namespace1: :ability1)
     assert result
   end
@@ -53,19 +54,19 @@ class AccessAllow::CheckTest < ActiveSupport::TestCase
   end
 
   test "call! delegates to possible! method" do
-    abilities_manager = stub('AbilitiesManager')
+    abilities_manager = stub("AbilitiesManager")
     AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
     abilities_manager.expects(:has?).with(:namespace1, :ability1).returns(true)
-    
+
     result = AccessAllow::Check.call!(@user, namespace1: :ability1)
     assert result
   end
 
   test "call! raises ViolationError when permission check fails" do
-    abilities_manager = stub('AbilitiesManager')
+    abilities_manager = stub("AbilitiesManager")
     AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
     abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
-    
+
     assert_raises AccessAllow::ViolationError do
       AccessAllow::Check.call!(@user, namespace1: :ability2)
     end
@@ -77,31 +78,96 @@ class AccessAllow::CheckTest < ActiveSupport::TestCase
   end
 
   test "possible? returns true when user has permission" do
-    abilities_manager = stub('AbilitiesManager')
+    abilities_manager = stub("AbilitiesManager")
     AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
     abilities_manager.expects(:has?).with(:namespace1, :ability1).returns(true)
-    
+
     check = AccessAllow::Check.new(@user, :namespace1, :ability1)
     assert check.possible?
   end
 
   test "possible? returns false when user doesn't have permission" do
-    abilities_manager = stub('AbilitiesManager')
+    abilities_manager = stub("AbilitiesManager")
     AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
     abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
-    
+
     check = AccessAllow::Check.new(@user, :namespace1, :ability2)
     refute check.possible?
   end
 
   test "possible! raises ViolationError when check fails" do
-    abilities_manager = stub('AbilitiesManager')
+    abilities_manager = stub("AbilitiesManager")
     AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
     abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
-    
+
     check = AccessAllow::Check.new(@user, :namespace1, :ability2)
-    assert_raises AccessAllow::ViolationError do
+    error = assert_raises AccessAllow::ViolationError do
       check.possible!
     end
+    assert_match(/cannot do 'ability2'/, error.message)
+  end
+
+  test "failed check logs at the default :debug level" do
+    abilities_manager = stub("AbilitiesManager")
+    AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
+    abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
+    Rails.logger.expects(:debug)
+
+    refute AccessAllow::Check.new(@user, :namespace1, :ability2).possible?
+  end
+
+  test "failed check honours a custom permission_check_log_level" do
+    original = AccessAllow.configuration.permission_check_log_level
+    AccessAllow.configuration.permission_check_log_level = :warn
+    abilities_manager = stub("AbilitiesManager")
+    AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
+    abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
+    Rails.logger.expects(:warn)
+
+    refute AccessAllow::Check.new(@user, :namespace1, :ability2).possible?
+  ensure
+    AccessAllow.configuration.permission_check_log_level = original
+  end
+
+  test "permission_check_log_level = nil silences failed-check logging" do
+    original = AccessAllow.configuration.permission_check_log_level
+    AccessAllow.configuration.permission_check_log_level = nil
+    abilities_manager = stub("AbilitiesManager")
+    AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
+    abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
+    Rails.logger.expects(:debug).never
+
+    refute AccessAllow::Check.new(@user, :namespace1, :ability2).possible?
+  ensure
+    AccessAllow.configuration.permission_check_log_level = original
+  end
+
+  test "logging uses AccessAllow.configuration.logger when set" do
+    custom_logger = stub("CustomLogger")
+    custom_logger.expects(:debug)
+    AccessAllow.configuration.logger = custom_logger
+    abilities_manager = stub("AbilitiesManager")
+    AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
+    abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
+
+    refute AccessAllow::Check.new(@user, :namespace1, :ability2).possible?
+  ensure
+    AccessAllow.configuration.logger = nil
+  end
+
+  test "failed-check logging is a no-op when no logger is available" do
+    Rails.stubs(:logger).returns(nil)
+    abilities_manager = stub("AbilitiesManager")
+    AccessAllow::AbilitiesManager.expects(:new).with(@user).returns(abilities_manager)
+    abilities_manager.expects(:has?).with(:namespace1, :ability2).returns(false)
+
+    refute AccessAllow::Check.new(@user, :namespace1, :ability2).possible?
+  end
+
+  test "possible! on a nil user raises with an unauthenticated message" do
+    error = assert_raises AccessAllow::ViolationError do
+      AccessAllow::Check.new(nil, :namespace1, :ability1).possible!
+    end
+    assert_match(/Unauthenticated user cannot do 'ability1'/, error.message)
   end
 end
